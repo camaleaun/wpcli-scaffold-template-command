@@ -60,6 +60,13 @@ class Camaleaun_Scaffold_Template_Command extends WP_CLI_Command {
 	 *   - `git@host:vendor/repo.git`         full SSH remote URL
 	 *   - `./path` or `/abs/path`            local directory
 	 *
+	 * Append `:<subpath>` to any format to use a subdirectory of the repo
+	 * as the pack root (for multi-pack repos):
+	 *   - `vendor/repo:plugin`               use repo/plugin/ as pack root
+	 *   - `vendor/repo@1.0.0:theme`          pin + subpath
+	 *   - `https://host/vendor/repo:block`   full URL + subpath
+	 *   - `./my-packs:plugin`                local multi-pack + subpath
+	 *
 	 * <slug>
 	 * : Slug for the generated project (directory name, text-domain, etc.).
 	 *
@@ -104,6 +111,14 @@ class Camaleaun_Scaffold_Template_Command extends WP_CLI_Command {
 	 *     # bare repo — owner + pattern from wp-cli.yml
 	 *     $ wp scaffold template plugin my-plugin
 	 *
+	 *     # multi-pack repo — :subpath selects which pack to use
+	 *     $ wp scaffold template camaleaun/wp-scaffold-wp:plugin my-plugin
+	 *     $ wp scaffold template camaleaun/wp-scaffold-wp:theme  my-theme
+	 *     $ wp scaffold template camaleaun/wp-scaffold-wp:block  my-block
+	 *
+	 *     # pin to tag + subpath
+	 *     $ wp scaffold template camaleaun/wp-scaffold-wp@1.2.0:plugin my-plugin
+	 *
 	 *     # full HTTPS URL
 	 *     $ wp scaffold template https://github.com/camaleaun/wp-scaffold-plugin my-plugin
 	 *
@@ -113,11 +128,8 @@ class Camaleaun_Scaffold_Template_Command extends WP_CLI_Command {
 	 *     # GitLab provider
 	 *     $ wp scaffold template acme/my-tpl my-thing --git=gitlab
 	 *
-	 *     # pin to tag
-	 *     $ wp scaffold template camaleaun/wp-scaffold-plugin@1.2.0 my-plugin
-	 *
-	 *     # local path
-	 *     $ wp scaffold template ./path/to/my-template my-thing
+	 *     # local multi-pack
+	 *     $ wp scaffold template ./my-packs:plugin my-plugin
 	 *
 	 *     # wp-cli.yml defaults (set once, never repeat)
 	 *     # scaffold template:
@@ -175,13 +187,36 @@ class Camaleaun_Scaffold_Template_Command extends WP_CLI_Command {
 	 */
 	private function resolve_pack( string $template_ref, array $assoc_args ): string {
 
+		// ── 0. Extract optional :subpath suffix ──────────────────────────────
+		// Syntax: <ref>:<subpath> — the colon must be preceded by a non-colon char
+		// and the subpath must not be empty. Applies to every ref format.
+		// Examples:
+		//   camaleaun/wp-scaffold-wp:plugin
+		//   camaleaun/wp-scaffold-wp@1.0.0:plugin
+		//   https://github.com/acme/repo@1.0.0:theme
+		//   git@github.com:acme/repo.git@1.0.0:block   ← host colon is before the /
+		$subpath = '';
+		if ( preg_match( '#^(.*[^:]):([^:].*)$#', $template_ref, $sm ) ) {
+			// Make sure this isn't the host-colon in a SSH URL (git@host:vendor/repo)
+			// SSH colons always appear before the first '/', subpath colons after.
+			$candidate_ref     = $sm[1];
+			$candidate_subpath = $sm[2];
+			$is_ssh_host_colon = str_starts_with( $template_ref, 'git@' )
+				&& ! str_contains( $candidate_subpath, '/' )
+				&& ! str_contains( $candidate_ref, '/' );
+			if ( ! $is_ssh_host_colon ) {
+				$template_ref = $candidate_ref;
+				$subpath      = trim( $candidate_subpath, '/' );
+			}
+		}
+
 		// ── 1. Local path ─────────────────────────────────────────────────────
 		if ( str_starts_with( $template_ref, '.' ) || str_starts_with( $template_ref, '/' ) ) {
 			$path = realpath( $template_ref );
 			if ( ! $path || ! is_dir( $path ) ) {
 				WP_CLI::error( "Local template path not found: {$template_ref}" );
 			}
-			return $path;
+			return $this->apply_subpath( $path, $subpath );
 		}
 
 		// ── 2. Full remote URL (HTTPS or SSH) ─────────────────────────────────
@@ -189,7 +224,8 @@ class Camaleaun_Scaffold_Template_Command extends WP_CLI_Command {
 			|| str_starts_with( $template_ref, 'git@' ) ) {
 			[ $clone_url, $ref ] = $this->split_ref_from_url( $template_ref );
 			$cache_key           = $this->url_to_cache_key( $clone_url, $ref );
-			return $this->clone_or_update( $clone_url, $ref, $cache_key, $template_ref );
+			$pack_path           = $this->clone_or_update( $clone_url, $ref, $cache_key, $template_ref );
+			return $this->apply_subpath( $pack_path, $subpath );
 		}
 
 		// ── 3 & 4. Short reference: [vendor/]repo[@ref] ───────────────────────
@@ -228,8 +264,9 @@ class Camaleaun_Scaffold_Template_Command extends WP_CLI_Command {
 		$host      = $this->git_host( Utils\get_flag_value( $assoc_args, 'git', 'github' ) );
 		$clone_url = "https://{$host}/{$vendor}/{$repo_name}.git";
 		$cache_key = "{$vendor}--{$repo_name}" . ( 'HEAD' === $ref ? '' : '@' . $ref );
+		$pack_path = $this->clone_or_update( $clone_url, $ref, $cache_key, "{$vendor}/{$repo_name}" );
 
-		return $this->clone_or_update( $clone_url, $ref, $cache_key, "{$vendor}/{$repo_name}" );
+		return $this->apply_subpath( $pack_path, $subpath );
 	}
 
 	/**
@@ -249,6 +286,23 @@ class Camaleaun_Scaffold_Template_Command extends WP_CLI_Command {
 			return str_replace( '{}', $name, $pattern );
 		}
 		return $name;
+	}
+
+	/**
+	 * Appends a subpath to a pack root, validating the result is a directory.
+	 *
+	 * @param string $pack_root Absolute path to the cloned/local repo root.
+	 * @param string $subpath   Relative subpath extracted from the ref (may be empty).
+	 */
+	private function apply_subpath( string $pack_root, string $subpath ): string {
+		if ( '' === $subpath ) {
+			return $pack_root;
+		}
+		$full = $pack_root . '/' . $subpath;
+		if ( ! is_dir( $full ) ) {
+			WP_CLI::error( "Subpath not found in template pack: {$subpath}" );
+		}
+		return $full;
 	}
 
 	/**
@@ -497,7 +551,7 @@ class Camaleaun_Scaffold_Template_Command extends WP_CLI_Command {
 	 * @return list<string> Paths of files actually written.
 	 */
 	private function generate_files( array $spec, string $pack_path, string $out_dir, array $vars, bool $force ): array {
-		$templates_dir = $pack_path . '/templates';
+		$templates_dir = $pack_path;
 		$mustache      = new Mustache_Engine();
 		$written       = [];
 
@@ -507,7 +561,7 @@ class Camaleaun_Scaffold_Template_Command extends WP_CLI_Command {
 			// skip_when: { flag: skip-tests }
 			if ( isset( $group['skip_when']['flag'] ) ) {
 				$flag = $group['skip_when']['flag'];
-				if ( Utils\get_flag_value( $GLOBALS['assoc_args'] ?? [], $flag, false ) ) {
+				if ( Utils\get_flag_value( $assoc_args, $flag, false ) ) {
 					continue;
 				}
 			}

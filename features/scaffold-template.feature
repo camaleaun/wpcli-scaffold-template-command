@@ -15,7 +15,7 @@ Feature: wp scaffold template
             - dest: "{{slug}}.txt"
               template: out.mustache
       """
-    And a file exists at {RUN_DIR}/local-tpl/templates/out.mustache:
+    And a file exists at {RUN_DIR}/local-tpl/out.mustache:
       """
       slug={{slug}}
       """
@@ -227,7 +227,7 @@ Feature: wp scaffold template
             - dest: "{{slug}}-ok.txt"
               template: ok.mustache
       """
-    And a file exists at {RUN_DIR}/broken-tpl/templates/ok.mustache:
+    And a file exists at {RUN_DIR}/broken-tpl/ok.mustache:
       """
       ok
       """
@@ -256,7 +256,7 @@ Feature: wp scaffold template
             - dest: "{{slug}}.php"
               template: out.mustache
       """
-    And a file exists at {RUN_DIR}/dest-tpl/templates/out.mustache:
+    And a file exists at {RUN_DIR}/dest-tpl/out.mustache:
       """
       ok
       """
@@ -279,7 +279,7 @@ Feature: wp scaffold template
             - dest: "{{slug}}.txt"
               template: out.mustache
       """
-    And a file exists at {RUN_DIR}/skip-existing-tpl/templates/out.mustache:
+    And a file exists at {RUN_DIR}/skip-existing-tpl/out.mustache:
       """
       ok
       """
@@ -302,7 +302,7 @@ Feature: wp scaffold template
             - dest: "{{slug}}.txt"
               template: out.mustache
       """
-    And a file exists at {RUN_DIR}/force-tpl/templates/out.mustache:
+    And a file exists at {RUN_DIR}/force-tpl/out.mustache:
       """
       ok
       """
@@ -330,7 +330,7 @@ Feature: wp scaffold template
             - dest: "{{slug}}.txt"
               template: out.mustache
       """
-    And a file exists at {RUN_DIR}/dir-tpl/templates/out.mustache:
+    And a file exists at {RUN_DIR}/dir-tpl/out.mustache:
       """
       ok
       """
@@ -373,7 +373,7 @@ Feature: wp scaffold template
             - dest: out.txt
               template: out.mustache
       """
-    And a file exists at {RUN_DIR}/slug-tpl/templates/out.mustache:
+    And a file exists at {RUN_DIR}/slug-tpl/out.mustache:
       """
       {{slug}}
       """
@@ -401,7 +401,7 @@ Feature: wp scaffold template
             - dest: out.txt
               template: out.mustache
       """
-    And a file exists at {RUN_DIR}/default-tpl/templates/out.mustache:
+    And a file exists at {RUN_DIR}/default-tpl/out.mustache:
       """
       {{color}}
       """
@@ -429,7 +429,7 @@ Feature: wp scaffold template
             - dest: out.txt
               template: out.mustache
       """
-    And a file exists at {RUN_DIR}/override-tpl/templates/out.mustache:
+    And a file exists at {RUN_DIR}/override-tpl/out.mustache:
       """
       {{color}}
       """
@@ -458,7 +458,7 @@ Feature: wp scaffold template
             - dest: out.txt
               template: out.mustache
       """
-    And a file exists at {RUN_DIR}/derive-tpl/templates/out.mustache:
+    And a file exists at {RUN_DIR}/derive-tpl/out.mustache:
       """
       {{plugin_name}}
       """
@@ -487,7 +487,7 @@ Feature: wp scaffold template
             - dest: out.txt
               template: out.mustache
       """
-    And a file exists at {RUN_DIR}/derive-skip-tpl/templates/out.mustache:
+    And a file exists at {RUN_DIR}/derive-skip-tpl/out.mustache:
       """
       {{plugin_name}}
       """
@@ -519,7 +519,7 @@ Feature: wp scaffold template
             - dest: out.txt
               template: out.mustache
       """
-    And a file exists at {RUN_DIR}/computed-tpl/templates/out.mustache:
+    And a file exists at {RUN_DIR}/computed-tpl/out.mustache:
       """
       {{plugin_name}}|{{plugin_upper}}
       """
@@ -550,7 +550,7 @@ Feature: wp scaffold template
             - dest: out.txt
               template: out.mustache
       """
-    And a file exists at {RUN_DIR}/concat-tpl/templates/out.mustache:
+    And a file exists at {RUN_DIR}/concat-tpl/out.mustache:
       """
       {{ns_test}}
       """
@@ -578,7 +578,7 @@ Feature: wp scaffold template
             - dest: out.txt
               template: out.mustache
       """
-    And a file exists at {RUN_DIR}/vars-tpl/templates/out.mustache:
+    And a file exists at {RUN_DIR}/vars-tpl/out.mustache:
       """
       {{display_author}}
       """
@@ -604,7 +604,7 @@ Feature: wp scaffold template
             - dest: out.txt
               template: out.mustache
       """
-    And a file exists at {RUN_DIR}/direct-tpl/templates/out.mustache:
+    And a file exists at {RUN_DIR}/direct-tpl/out.mustache:
       """
       {{greeting}}
       """
@@ -639,7 +639,7 @@ pl/scaffold.yml:
             - dest: extras.txt
               template: out.mustache
       """
-    And a file exists at {RUN_DIR}/skipgroup-tpl/templates/out.mustache:
+    And a file exists at {RUN_DIR}/skipgroup-tpl/out.mustache:
       """
       ok
       """
@@ -675,7 +675,7 @@ pl/scaffold.yml:
               template: out.mustache
               when: gitlab
       """
-    And a file exists at {RUN_DIR}/select-tpl/templates/out.mustache:
+    And a file exists at {RUN_DIR}/select-tpl/out.mustache:
       """
       ok
       """
@@ -711,7 +711,7 @@ pl/scaffold.yml:
               template: out.mustache
               when: gitlab
       """
-    And a file exists at {RUN_DIR}/select-default-tpl/templates/out.mustache:
+    And a file exists at {RUN_DIR}/select-default-tpl/out.mustache:
       """
       ok
       """
@@ -749,7 +749,7 @@ pl/scaffold.yml:
         - action: plugin_activate
           when: { flag: activate }
       """
-    And a file exists at {RUN_DIR}/activate-tpl/templates/plugin.mustache:
+    And a file exists at {RUN_DIR}/activate-tpl/plugin.mustache:
       """
       <?php
       /* Plugin Name: Test Activate */
@@ -787,7 +787,7 @@ pl/scaffold.yml:
         - action: plugin_activate
           when: { flag: activate }
       """
-    And a file exists at {RUN_DIR}/no-activate-tpl/templates/plugin.mustache:
+    And a file exists at {RUN_DIR}/no-activate-tpl/plugin.mustache:
       """
       <?php
       /* Plugin Name: Test No Activate */
@@ -799,7 +799,126 @@ pl/scaffold.yml:
       Status: Inactive
       """
 
-  # ── wp-scaffold-plugin integration ────────────────────────────────────────────
+  # ── Subpath (multi-pack repos) ────────────────────────────────────────────────
+
+  Scenario: Local multi-pack via :subpath selects plugin pack
+    Given a WP install
+    And a directory exists at {RUN_DIR}/multi-pack/plugin
+    And a file exists at {RUN_DIR}/multi-pack/plugin/scaffold.yml:
+      """
+      name: test/plugin
+      version: 1
+      files:
+        core:
+          items:
+            - dest: "{{slug}}.php"
+              template: plugin.mustache
+      """
+    And a file exists at {RUN_DIR}/multi-pack/plugin/plugin.mustache:
+      """
+      plugin
+      """
+    And a directory exists at {RUN_DIR}/multi-pack/theme
+    And a file exists at {RUN_DIR}/multi-pack/theme/scaffold.yml:
+      """
+      name: test/theme
+      version: 1
+      files:
+        core:
+          items:
+            - dest: style.css
+              template: style.mustache
+      """
+    And a file exists at {RUN_DIR}/multi-pack/theme/style.mustache:
+      """
+      theme
+      """
+    When I run `wp scaffold template {RUN_DIR}/multi-pack:plugin my-plugin`
+    Then STDOUT should contain:
+      """
+      Created: my-plugin.php
+      """
+    And STDOUT should not contain:
+      """
+      style.css
+      """
+
+  Scenario: Local multi-pack :theme subpath
+    Given a WP install
+    And a directory exists at {RUN_DIR}/multi2/theme
+    And a file exists at {RUN_DIR}/multi2/theme/scaffold.yml:
+      """
+      name: test/theme
+      version: 1
+      files:
+        core:
+          items:
+            - dest: style.css
+              template: style.mustache
+      """
+    And a file exists at {RUN_DIR}/multi2/theme/style.mustache:
+      """
+      theme
+      """
+    When I run `wp scaffold template {RUN_DIR}/multi2:theme my-theme`
+    Then STDOUT should contain:
+      """
+      Created: style.css
+      """
+
+  Scenario: :subpath that does not exist produces error
+    Given a WP install
+    And a directory exists at {RUN_DIR}/multi3
+    And a file exists at {RUN_DIR}/multi3/scaffold.yml:
+      """
+      name: test/root
+      version: 1
+      files:
+        core:
+          items:
+            - dest: out.txt
+              template: out.mustache
+      """
+    When I try `wp scaffold template {RUN_DIR}/multi3:no-such-subpath my-thing`
+    Then STDERR should contain:
+      """
+      Error: Subpath not found in template pack: no-such-subpath
+      """
+    And the return code should be 1
+
+  Scenario: vendor/repo:subpath in short ref
+    Given a WP install
+    When I try `wp scaffold template camaleaun/wp-scaffold-wp:plugin my-plugin`
+    Then STDOUT should contain:
+      """
+      camaleaun/wp-scaffold-wp
+      """
+
+  Scenario: vendor/repo@ref:subpath combines pin and subpath
+    Given a WP install
+    When I try `wp scaffold template camaleaun/wp-scaffold-wp@1.0.0:plugin my-plugin`
+    Then STDOUT should contain:
+      """
+      1.0.0
+      """
+
+  Scenario: Full HTTPS URL with @ref:subpath
+    Given a WP install
+    When I try `wp scaffold template https://github.com/camaleaun/wp-scaffold-wp@1.0.0:plugin my-plugin`
+    Then STDOUT should contain:
+      """
+      1.0.0
+      """
+
+  Scenario: SSH URL with @ref:subpath
+    Given a WP install
+    When I try `wp scaffold template git@github.com:camaleaun/wp-scaffold-wp.git@1.0.0:plugin my-plugin`
+    Then STDOUT should contain:
+      """
+      1.0.0
+      """
+
+    # ── wp-scaffold-plugin integration ────────────────────────────────────────────
 
   Scenario: Full scaffold from camaleaun/wp-scaffold-plugin (local copy)
     Given a WP install
