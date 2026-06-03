@@ -150,7 +150,8 @@ class Camaleaun_Scaffold_Template_Command extends WP_CLI_Command {
 		$pack_path = $this->resolve_pack( $template_ref, $assoc_args );
 
 		// ── 2. Load and validate scaffold.yml ────────────────────────────────
-		$spec = $this->load_spec( $pack_path );
+		$spec                = $this->load_spec( $pack_path );
+		$spec['__pack_path'] = $pack_path; // passed to resolve_vars for computed.php lookup
 
 		// ── 3. Resolve all variables ──────────────────────────────────────────
 		$vars = $this->resolve_vars( $spec, $slug, $assoc_args );
@@ -406,7 +407,13 @@ class Camaleaun_Scaffold_Template_Command extends WP_CLI_Command {
 	 *   1. Parameter defaults from scaffold.yml
 	 *   2. `derive` expressions (when default is null and user didn't pass the flag)
 	 *   3. User-supplied CLI flags
-	 *   4. `computed` expressions (always re-evaluated after all inputs are settled)
+	 *   4a. computed.php — if the file exists in the pack it is included and called
+	 *       with the current $vars; its return value replaces $vars entirely.
+	 *       When computed.php is present, `computed:` in scaffold.yml is ignored.
+	 *   4b. `computed:` YAML expressions — used only when computed.php is absent.
+	 *
+	 * computed.php must return a callable:
+	 *   <?php return function(array $vars): array { ...; return $vars; };
 	 *
 	 * @param  array<string,mixed> $spec
 	 * @param  array<string,mixed> $assoc_args
@@ -443,9 +450,18 @@ class Camaleaun_Scaffold_Template_Command extends WP_CLI_Command {
 			}
 		}
 
-		// 4. Computed — always evaluated last so they can reference resolved params.
-		foreach ( $spec['computed'] ?? [] as $name => $expr ) {
-			$vars[ $name ] = $this->evaluate_expr( $expr, $vars );
+		// 4. Computed — computed.php wins over computed: YAML.
+		$computed_php = ( $spec['__pack_path'] ?? '' ) . '/computed.php';
+		if ( file_exists( $computed_php ) ) {
+			$fn = require $computed_php;
+			if ( ! is_callable( $fn ) ) {
+				WP_CLI::error( 'computed.php must return a callable: function(array $vars): array { ... }' );
+			}
+			$vars = $fn( $vars );
+		} else {
+			foreach ( $spec['computed'] ?? [] as $name => $expr ) {
+				$vars[ $name ] = $this->evaluate_expr( $expr, $vars );
+			}
 		}
 
 		// 5. Apply explicit variable mapping from scaffold.yml (if present).
