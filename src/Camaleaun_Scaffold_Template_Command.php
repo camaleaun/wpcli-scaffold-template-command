@@ -5,18 +5,26 @@ use WP_CLI\Utils;
 /**
  * Generates project scaffolding from a remote template pack.
  *
- * A template pack is a GitHub repository containing:
- * - `scaffold.yml`  — declares parameters, computed values, variable mapping and files
- * - `templates/`    — Mustache template files
+ * A template pack is any Git repository (or local directory) containing
+ * a `scaffold.yml` and a `templates/` directory with Mustache files.
  *
  * Both Mustache (Mustache_Engine) and YAML (Mustangostang\Spyc) are bundled
  * inside wp-cli.phar — no extra Composer dependencies required in this package.
  *
  * ## EXAMPLES
  *
+ *     # Full vendor/repo — GitHub by default
  *     $ wp scaffold template camaleaun/wp-scaffold-plugin my-plugin
- *     $ wp scaffold template camaleaun/wp-scaffold-plugin my-plugin --plugin_author="Jane"
- *     $ wp scaffold template camaleaun/wp-scaffold-theme my-theme --activate
+ *
+ *     # Repo only — resolves with --owner + --repo-pattern from wp-cli.yml
+ *     $ wp scaffold template plugin my-plugin
+ *
+ *     # Full remote URL (GitHub / GitLab / Bitbucket, HTTPS or SSH)
+ *     $ wp scaffold template https://github.com/camaleaun/wp-scaffold-plugin my-plugin
+ *     $ wp scaffold template git@gitlab.com:acme/wp-scaffold-plugin.git my-plugin
+ *
+ *     # Local path
+ *     $ wp scaffold template ./my-template my-thing
  *
  * @package camaleaun/wpcli-scaffold-template-command
  */
@@ -37,18 +45,52 @@ class Camaleaun_Scaffold_Template_Command extends WP_CLI_Command {
 	/**
 	 * Generates project scaffolding from a template pack.
 	 *
-	 * Downloads (or updates) the template pack from GitHub, reads its
-	 * `scaffold.yml`, resolves all variables and renders each Mustache
-	 * template into the target directory.
+	 * Downloads (or updates) the template pack, reads its `scaffold.yml`,
+	 * resolves all variables and renders each Mustache template into the
+	 * target directory.
 	 *
 	 * ## OPTIONS
 	 *
 	 * <template>
-	 * : GitHub repository of the template pack in `vendor/repo` format.
-	 * Use `vendor/repo@ref` to pin a branch, tag or commit.
+	 * : Template pack reference. Accepted formats:
+	 *   - `vendor/repo`                      vendor/repo on --git host (default: github)
+	 *   - `vendor/repo@ref`                  pin to branch, tag or commit
+	 *   - `repo`                             repo only — owner from --owner
+	 *   - `https://host/vendor/repo[.git]`   full HTTPS remote URL
+	 *   - `git@host:vendor/repo.git`         full SSH remote URL
+	 *   - `./path` or `/abs/path`            local directory
 	 *
 	 * <slug>
-	 * : The slug for the generated project (directory name, text-domain, etc.).
+	 * : Slug for the generated project (directory name, text-domain, etc.).
+	 *
+	 * [--git=<provider>]
+	 * : Git hosting provider used when the template is a short `vendor/repo`
+	 * or bare `repo` reference.
+	 * ---
+	 * default: github
+	 * options:
+	 *   - github
+	 *   - gitlab
+	 *   - bitbucket
+	 * ---
+	 *
+	 * [--owner=<owner>]
+	 * : Default owner (user or organisation) used when the template reference
+	 * contains no slash, e.g. `wp scaffold template plugin my-plugin --owner=acme`.
+	 * Best set in wp-cli.yml so you never have to type it.
+	 *
+	 * [--repo-prefix=<prefix>]
+	 * : Prepend this string to the bare repo name.
+	 * `plugin` + `--repo-prefix=wp-scaffold-` => `wp-scaffold-plugin`.
+	 *
+	 * [--repo-suffix=<suffix>]
+	 * : Append this string to the bare repo name.
+	 * `plugin` + `--repo-suffix=-scaffold` => `plugin-scaffold`.
+	 *
+	 * [--repo-pattern=<pattern>]
+	 * : Shell-style glob pattern where `*` is replaced by the bare repo name.
+	 * `plugin` + `--repo-pattern=wp-scaffold-*` => `wp-scaffold-plugin`.
+	 * Takes precedence over --repo-prefix / --repo-suffix when all three are set.
 	 *
 	 * [--dir=<dirname>]
 	 * : Output directory. Defaults to the WordPress plugins directory.
@@ -58,24 +100,35 @@ class Camaleaun_Scaffold_Template_Command extends WP_CLI_Command {
 	 *
 	 * [--<field>=<value>]
 	 * : Any parameter declared in the template pack's scaffold.yml.
-	 * Run `wp scaffold template <template> --help` to list them.
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     # Scaffold a plugin using the default camaleaun plugin template
+	 *     # vendor/repo — GitHub (default)
 	 *     $ wp scaffold template camaleaun/wp-scaffold-plugin my-plugin
 	 *
-	 *     # Pass template parameters
-	 *     $ wp scaffold template camaleaun/wp-scaffold-plugin my-plugin \
-	 *         --plugin_name="My Plugin" \
-	 *         --plugin_author="Jane Doe" \
-	 *         --activate
+	 *     # bare repo — owner + pattern from wp-cli.yml
+	 *     $ wp scaffold template plugin my-plugin
 	 *
-	 *     # Pin to a specific tag
+	 *     # full HTTPS URL
+	 *     $ wp scaffold template https://github.com/camaleaun/wp-scaffold-plugin my-plugin
+	 *
+	 *     # SSH URL
+	 *     $ wp scaffold template git@gitlab.com:acme/my-tpl.git my-thing
+	 *
+	 *     # GitLab provider
+	 *     $ wp scaffold template acme/my-tpl my-thing --git=gitlab
+	 *
+	 *     # pin to tag
 	 *     $ wp scaffold template camaleaun/wp-scaffold-plugin@1.2.0 my-plugin
 	 *
-	 *     # Use a local template pack (path starting with ./ or /)
+	 *     # local path
 	 *     $ wp scaffold template ./path/to/my-template my-thing
+	 *
+	 *     # wp-cli.yml defaults (set once, never repeat)
+	 *     # scaffold template:
+	 *     #   owner: camaleaun
+	 *     #   git: github
+	 *     #   repo-pattern: wp-scaffold-*
 	 *
 	 * @when after_wp_load
 	 */
@@ -87,7 +140,7 @@ class Camaleaun_Scaffold_Template_Command extends WP_CLI_Command {
 		}
 
 		// ── 1. Resolve template pack path ────────────────────────────────────
-		$pack_path = $this->resolve_pack( $template_ref );
+		$pack_path = $this->resolve_pack( $template_ref, $assoc_args );
 
 		// ── 2. Load and validate scaffold.yml ────────────────────────────────
 		$spec = $this->load_spec( $pack_path );
@@ -117,14 +170,17 @@ class Camaleaun_Scaffold_Template_Command extends WP_CLI_Command {
 	/**
 	 * Returns the local path to a template pack, cloning or updating as needed.
 	 *
-	 * Accepts:
-	 *   - `vendor/repo`        — latest main/master from GitHub
-	 *   - `vendor/repo@ref`    — specific branch, tag or commit
-	 *   - `./local/path`       — local directory, used as-is
-	 *   - `/absolute/path`     — local directory, used as-is
+	 * Resolution pipeline:
+	 *   1. Local path     (starts with . or /)
+	 *   2. Full remote URL (https:// or git@)
+	 *   3. vendor/repo[@ref]  — host from --git
+	 *   4. repo[@ref]         — owner from --owner, repo name from --repo-pattern / prefix / suffix
+	 *
+	 * @param array<string,mixed> $assoc_args
 	 */
-	private function resolve_pack( string $template_ref ): string {
-		// Local path.
+	private function resolve_pack( string $template_ref, array $assoc_args ): string {
+
+		// ── 1. Local path ─────────────────────────────────────────────────────
 		if ( str_starts_with( $template_ref, '.' ) || str_starts_with( $template_ref, '/' ) ) {
 			$path = realpath( $template_ref );
 			if ( ! $path || ! is_dir( $path ) ) {
@@ -133,33 +189,137 @@ class Camaleaun_Scaffold_Template_Command extends WP_CLI_Command {
 			return $path;
 		}
 
-		// GitHub: vendor/repo[@ref]
-		$ref  = 'HEAD';
-		$repo = $template_ref;
+		// ── 2. Full remote URL (HTTPS or SSH) ─────────────────────────────────
+		if ( str_starts_with( $template_ref, 'https://' ) || str_starts_with( $template_ref, 'http://' )
+			|| str_starts_with( $template_ref, 'git@' ) ) {
+			[ $clone_url, $ref ] = $this->split_ref_from_url( $template_ref );
+			$cache_key           = $this->url_to_cache_key( $clone_url, $ref );
+			return $this->clone_or_update( $clone_url, $ref, $cache_key, $template_ref );
+		}
+
+		// ── 3 & 4. Short reference: [vendor/]repo[@ref] ───────────────────────
+		$ref     = 'HEAD';
+		$raw_ref = $template_ref;
+
+		// Split off @ref suffix (but not inside a URL — already handled above).
 		if ( str_contains( $template_ref, '@' ) ) {
-			[ $repo, $ref ] = explode( '@', $template_ref, 2 );
+			$at_pos  = strrpos( $template_ref, '@' );
+			$raw_ref = substr( $template_ref, 0, $at_pos );
+			$ref     = substr( $template_ref, $at_pos + 1 );
 		}
 
-		if ( ! preg_match( '#^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$#', $repo ) ) {
-			WP_CLI::error( "Invalid template reference: {$template_ref}. Use vendor/repo or vendor/repo@ref." );
+		// Determine vendor and repo.
+		if ( str_contains( $raw_ref, '/' ) ) {
+			// ── 3. vendor/repo ────────────────────────────────────────────────
+			[ $vendor, $repo_name ] = explode( '/', $raw_ref, 2 );
+		} else {
+			// ── 4. Bare repo — apply owner + naming pattern ───────────────────
+			$vendor    = Utils\get_flag_value( $assoc_args, 'owner', '' );
+			$repo_name = $this->apply_repo_pattern( $raw_ref, $assoc_args );
+
+			if ( ! $vendor ) {
+				WP_CLI::error(
+					"Template '{$template_ref}' has no owner. " .
+					'Pass --owner=<owner> or set it in wp-cli.yml under "scaffold template:".'
+				);
+			}
 		}
 
-		$cache_key  = str_replace( '/', '--', $repo ) . ( 'HEAD' === $ref ? '' : '@' . $ref );
+		if ( ! preg_match( '#^[A-Za-z0-9_.-]+$#', $vendor )
+			|| ! preg_match( '#^[A-Za-z0-9_.-]+$#', $repo_name ) ) {
+			WP_CLI::error( "Invalid template reference: {$template_ref}." );
+		}
+
+		$host      = $this->git_host( Utils\get_flag_value( $assoc_args, 'git', 'github' ) );
+		$clone_url = "https://{$host}/{$vendor}/{$repo_name}.git";
+		$cache_key = "{$vendor}--{$repo_name}" . ( 'HEAD' === $ref ? '' : '@' . $ref );
+
+		return $this->clone_or_update( $clone_url, $ref, $cache_key, "{$vendor}/{$repo_name}" );
+	}
+
+	/**
+	 * Applies --repo-pattern / --repo-prefix / --repo-suffix to a bare repo name.
+	 *
+	 * Priority: repo-pattern > repo-prefix + repo-suffix > name as-is.
+	 *
+	 * @param  array<string,mixed> $assoc_args
+	 */
+	private function apply_repo_pattern( string $name, array $assoc_args ): string {
+		$pattern = Utils\get_flag_value( $assoc_args, 'repo-pattern', '' );
+		if ( $pattern ) {
+			// Replace the first * in the pattern with the bare name.
+			return str_replace( '*', $name, $pattern );
+		}
+
+		$prefix = Utils\get_flag_value( $assoc_args, 'repo-prefix', '' );
+		$suffix = Utils\get_flag_value( $assoc_args, 'repo-suffix', '' );
+
+		return $prefix . $name . $suffix;
+	}
+
+	/**
+	 * Returns the clone URL and ref from a full remote URL that may end in @ref.
+	 *
+	 * @return array{0: string, 1: string} [clone_url, ref]
+	 */
+	private function split_ref_from_url( string $url ): array {
+		$ref = 'HEAD';
+		// @ref suffix only when it appears after the repo path, not inside the host.
+		if ( preg_match( '#^(https?://[^@]+|git@[^@]+)@([^@/]+)$#', $url, $m ) ) {
+			return [ rtrim( $m[1], '.git' ) . '.git', $m[2] ];
+		}
+		// Normalise: ensure .git suffix.
+		$clone_url = str_ends_with( $url, '.git' ) ? $url : $url . '.git';
+		return [ $clone_url, $ref ];
+	}
+
+	/**
+	 * Derives a filesystem-safe cache key from a clone URL and ref.
+	 */
+	private function url_to_cache_key( string $clone_url, string $ref ): string {
+		// Strip protocol and .git, replace path separators.
+		$key = preg_replace( '#^(https?://|git@)#', '', $clone_url );
+		$key = str_replace( [ ':', '/', '.git' ], [ '--', '--', '' ], $key );
+		if ( 'HEAD' !== $ref ) {
+			$key .= '@' . $ref;
+		}
+		return $key;
+	}
+
+	/**
+	 * Returns the hostname for a named Git provider.
+	 */
+	private function git_host( string $provider ): string {
+		return match ( strtolower( $provider ) ) {
+			'gitlab'    => 'gitlab.com',
+			'bitbucket' => 'bitbucket.org',
+			default     => 'github.com',   // 'github' or anything unrecognised
+		};
+	}
+
+	/**
+	 * Clones a repo or fetches + checks out the latest, then returns the local path.
+	 */
+	private function clone_or_update( string $clone_url, string $ref, string $cache_key, string $label ): string {
 		$local_path = $this->cache_dir . '/' . $cache_key;
 
 		if ( is_dir( $local_path . '/.git' ) ) {
-			WP_CLI::log( "Updating template pack {$template_ref}..." );
+			WP_CLI::log( "Updating template pack {$label}..." );
 			$this->shell( "git -C {$local_path} fetch --quiet origin" );
-			$checkout = ( 'HEAD' === $ref ) ? 'FETCH_HEAD' : $ref;
+			$checkout = ( 'HEAD' === $ref ) ? 'FETCH_HEAD' : escapeshellarg( $ref );
 			$this->shell( "git -C {$local_path} checkout --quiet {$checkout}" );
 		} else {
-			WP_CLI::log( "Downloading template pack {$template_ref}..." );
+			WP_CLI::log( "Downloading template pack {$label}..." );
 			wp_mkdir_p( $this->cache_dir );
-			$clone_url = "https://github.com/{$repo}.git";
-			$depth     = ( 'HEAD' === $ref ) ? '--depth=1' : '';
-			$this->shell( "git clone --quiet {$depth} {$clone_url} {$local_path}" );
+			$depth = ( 'HEAD' === $ref ) ? '--depth=1' : '';
+			$this->shell( sprintf(
+				'git clone --quiet %s %s %s',
+				$depth,
+				escapeshellarg( $clone_url ),
+				escapeshellarg( $local_path )
+			) );
 			if ( 'HEAD' !== $ref ) {
-				$this->shell( "git -C {$local_path} checkout --quiet {$ref}" );
+				$this->shell( "git -C {$local_path} checkout --quiet " . escapeshellarg( $ref ) );
 			}
 		}
 

@@ -114,15 +114,93 @@ Feature: wp scaffold template
       Success:
       """
 
+  Scenario: vendor/repo with --git=gitlab uses gitlab.com
+    Given a WP install
+    And I run `wp plugin path`
+    And save STDOUT as {PLUGIN_DIR}
+
+    When I try `wp scaffold template acme/some-tpl my-thing --git=gitlab`
+    Then STDERR should contain:
+      """
+      gitlab.com
+      """
+
+  Scenario: Bare repo with --owner resolves to vendor/repo
+    Given a WP install
+    And I run `wp plugin path`
+    And save STDOUT as {PLUGIN_DIR}
+
+    When I try `wp scaffold template plugin my-plugin --owner=camaleaun`
+    Then STDOUT should contain:
+      """
+      camaleaun/plugin
+      """
+
+  Scenario: Bare repo + --repo-prefix builds full repo name
+    Given a WP install
+
+    When I try `wp scaffold template plugin my-plugin --owner=camaleaun --repo-prefix=wp-scaffold-`
+    Then STDOUT should contain:
+      """
+      camaleaun/wp-scaffold-plugin
+      """
+
+  Scenario: Bare repo + --repo-pattern builds full repo name
+    Given a WP install
+
+    When I try `wp scaffold template plugin my-plugin --owner=camaleaun --repo-pattern=wp-scaffold-*`
+    Then STDOUT should contain:
+      """
+      camaleaun/wp-scaffold-plugin
+      """
+
+  Scenario: --repo-pattern takes precedence over --repo-prefix
+    Given a WP install
+
+    When I try `wp scaffold template plugin my-plugin --owner=camaleaun --repo-prefix=ignored- --repo-pattern=wp-scaffold-*`
+    Then STDOUT should contain:
+      """
+      camaleaun/wp-scaffold-plugin
+      """
+    And STDOUT should not contain:
+      """
+      ignored-
+      """
+
+  Scenario: Bare repo without --owner produces error
+    Given a WP install
+
+    When I try `wp scaffold template plugin my-plugin`
+    Then STDERR should contain:
+      """
+      Error: Template 'plugin' has no owner
+      """
+    And the return code should be 1
+
   Scenario: Invalid template reference produces error
     Given a WP install
 
-    When I try `wp scaffold template not-valid-repo my-plugin`
+    When I try `wp scaffold template not/valid/path my-plugin`
     Then STDERR should contain:
       """
       Error: Invalid template reference
       """
     And the return code should be 1
+
+  Scenario: wp-cli.yml defaults for owner and repo-pattern
+    Given a WP install
+    And a wp-cli.yml file:
+      """
+      scaffold template:
+        owner: camaleaun
+        repo-pattern: wp-scaffold-*
+      """
+
+    When I try `wp scaffold template plugin my-plugin`
+    Then STDOUT should contain:
+      """
+      camaleaun/wp-scaffold-plugin
+      """
 
   Scenario: scaffold.yml without files section produces error
     Given a WP install
