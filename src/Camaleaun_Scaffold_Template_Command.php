@@ -510,17 +510,68 @@ class Camaleaun_Scaffold_Template_Command extends WP_CLI_Command {
 	/**
 	 * Parses a comma-separated argument list for evaluate_expr().
 	 *
-	 * Handles quoted strings and variable references.
+	 * Splits only on commas that are at depth-0 (not inside parentheses or
+	 * single-quoted strings), so nested calls like:
+	 *   strtoupper(str_replace('-', '_', slug))
+	 * are handled correctly.
 	 *
 	 * @param  array<string,mixed> $vars
 	 * @return list<string>
 	 */
 	private function parse_args( string $raw, array $vars ): array {
-		// Split on commas that are NOT inside single quotes.
-		$parts = preg_split( "/,(?=(?:[^']*'[^']*')*[^']*$)/", $raw );
-		$argv  = [];
+		$parts  = [];
+		$depth  = 0;   // parenthesis nesting depth
+		$in_str = false;
+		$buf    = '';
+		$len    = strlen( $raw );
+
+		for ( $i = 0; $i < $len; $i++ ) {
+			$ch = $raw[ $i ];
+
+			if ( $in_str ) {
+				// Inside a single-quoted string — only closing quote ends it.
+				$buf .= $ch;
+				if ( '\'' === $ch && ( $i === 0 || '\\' !== $raw[ $i - 1 ] ) ) {
+					$in_str = false;
+				}
+				continue;
+			}
+
+			if ( '\'' === $ch ) {
+				$in_str = true;
+				$buf   .= $ch;
+				continue;
+			}
+
+			if ( '(' === $ch ) {
+				$depth++;
+				$buf .= $ch;
+				continue;
+			}
+
+			if ( ')' === $ch ) {
+				$depth--;
+				$buf .= $ch;
+				continue;
+			}
+
+			if ( ',' === $ch && 0 === $depth ) {
+				// Top-level comma — flush current token.
+				$parts[] = trim( $buf );
+				$buf     = '';
+				continue;
+			}
+
+			$buf .= $ch;
+		}
+
+		if ( '' !== trim( $buf ) ) {
+			$parts[] = trim( $buf );
+		}
+
+		$argv = [];
 		foreach ( $parts as $part ) {
-			$argv[] = $this->evaluate_expr( trim( $part ), $vars );
+			$argv[] = $this->evaluate_expr( $part, $vars );
 		}
 		return $argv;
 	}
