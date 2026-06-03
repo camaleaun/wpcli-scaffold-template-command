@@ -80,10 +80,11 @@ class Camaleaun_Scaffold_Template_Command extends WP_CLI_Command {
 	 * Best set in wp-cli.yml so you never have to type it.
 	 *
 	 * [--repo-pattern=<pattern>]
-	 * : Pattern where `*` is replaced by the bare repo name.
-	 * `plugin` + `--repo-pattern=wp-scaffold-*` => `wp-scaffold-plugin`.
-	 * `plugin` + `--repo-pattern=*-scaffold`    => `plugin-scaffold`.
-	 * `plugin` + `--repo-pattern=my-*-tpl`      => `my-plugin-tpl`.
+	 * : Pattern where `{}` is replaced by the bare repo name.
+	 * `plugin` + `--repo-pattern=wp-scaffold-{}` => `wp-scaffold-plugin`.
+	 * `plugin` + `--repo-pattern={}-scaffold`    => `plugin-scaffold`.
+	 * `plugin` + `--repo-pattern=my-{}-tpl`      => `my-plugin-tpl`.
+	 * Safe to use unquoted — `{}` is never expanded by the shell.
 	 * Best set in wp-cli.yml so you never have to type it.
 	 *
 	 * [--dir=<dirname>]
@@ -122,7 +123,7 @@ class Camaleaun_Scaffold_Template_Command extends WP_CLI_Command {
 	 *     # scaffold template:
 	 *     #   owner: camaleaun
 	 *     #   git: github
-	 *     #   repo-pattern: wp-scaffold-*
+	 *     #   repo-pattern: wp-scaffold-{}
 	 *
 	 * @when after_wp_load
 	 */
@@ -168,7 +169,7 @@ class Camaleaun_Scaffold_Template_Command extends WP_CLI_Command {
 	 *   1. Local path     (starts with . or /)
 	 *   2. Full remote URL (https:// or git@)
 	 *   3. vendor/repo[@ref]  — host from --git
-	 *   4. repo[@ref]         — owner from --owner, repo name from --repo-pattern / prefix / suffix
+	 *   4. repo[@ref]         — owner from --owner, repo name optionally transformed by --repo-pattern (e.g. wp-scaffold-{})
 	 *
 	 * @param array<string,mixed> $assoc_args
 	 */
@@ -234,15 +235,18 @@ class Camaleaun_Scaffold_Template_Command extends WP_CLI_Command {
 	/**
 	 * Applies --repo-pattern to a bare repo name.
 	 *
-	 * Every `*` in the pattern is replaced by the bare name.
+	 * Every `{}` in the pattern is replaced by the bare name.
 	 * When no pattern is set the name is returned as-is.
+	 *
+	 * Uses `{}` (not `*`) to avoid shell glob expansion when the flag
+	 * is passed without quotes, e.g. --repo-pattern=wp-scaffold-{}
 	 *
 	 * @param  array<string,mixed> $assoc_args
 	 */
 	private function apply_repo_pattern( string $name, array $assoc_args ): string {
 		$pattern = Utils\get_flag_value( $assoc_args, 'repo-pattern', '' );
 		if ( $pattern ) {
-			return str_replace( '*', $name, $pattern );
+			return str_replace( '{}', $name, $pattern );
 		}
 		return $name;
 	}

@@ -108,7 +108,7 @@ Feature: wp scaffold template
 
   Scenario: Bare repo + --owner + --repo-pattern with prefix
     Given a WP install
-    When I try `wp scaffold template plugin my-plugin --owner=camaleaun --repo-pattern=wp-scaffold-*`
+    When I try `wp scaffold template plugin my-plugin --owner=camaleaun --repo-pattern=wp-scaffold-{}`
     Then STDOUT should contain:
       """
       camaleaun/wp-scaffold-plugin
@@ -116,7 +116,7 @@ Feature: wp scaffold template
 
   Scenario: --repo-pattern with suffix
     Given a WP install
-    When I try `wp scaffold template plugin my-plugin --owner=acme --repo-pattern=*-scaffold`
+    When I try `wp scaffold template plugin my-plugin --owner=acme --repo-pattern={}-scaffold`
     Then STDOUT should contain:
       """
       acme/plugin-scaffold
@@ -124,15 +124,15 @@ Feature: wp scaffold template
 
   Scenario: --repo-pattern with prefix and suffix
     Given a WP install
-    When I try `wp scaffold template block my-block --owner=acme --repo-pattern=my-*-tpl`
+    When I try `wp scaffold template block my-block --owner=acme --repo-pattern=my-{}-tpl`
     Then STDOUT should contain:
       """
       acme/my-block-tpl
       """
 
-  Scenario: --repo-pattern=* is identity
+  Scenario: --repo-pattern={} is identity (no transformation)
     Given a WP install
-    When I try `wp scaffold template my-plugin my-plugin --owner=acme --repo-pattern=*`
+    When I try `wp scaffold template my-plugin my-plugin --owner=acme --repo-pattern={}`
     Then STDOUT should contain:
       """
       acme/my-plugin
@@ -163,7 +163,7 @@ Feature: wp scaffold template
       scaffold template:
         owner: camaleaun
         git: github
-        repo-pattern: wp-scaffold-*
+        repo-pattern: wp-scaffold-{}
       """
     When I try `wp scaffold template plugin my-plugin`
     Then STDOUT should contain:
@@ -177,7 +177,7 @@ Feature: wp scaffold template
       """
       scaffold template:
         owner: camaleaun
-        repo-pattern: wp-scaffold-*
+        repo-pattern: wp-scaffold-{}
       """
     When I try `wp scaffold template plugin my-plugin --owner=acme`
     Then STDOUT should contain:
