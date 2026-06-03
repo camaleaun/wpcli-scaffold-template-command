@@ -79,18 +79,12 @@ class Camaleaun_Scaffold_Template_Command extends WP_CLI_Command {
 	 * contains no slash, e.g. `wp scaffold template plugin my-plugin --owner=acme`.
 	 * Best set in wp-cli.yml so you never have to type it.
 	 *
-	 * [--repo-prefix=<prefix>]
-	 * : Prepend this string to the bare repo name.
-	 * `plugin` + `--repo-prefix=wp-scaffold-` => `wp-scaffold-plugin`.
-	 *
-	 * [--repo-suffix=<suffix>]
-	 * : Append this string to the bare repo name.
-	 * `plugin` + `--repo-suffix=-scaffold` => `plugin-scaffold`.
-	 *
 	 * [--repo-pattern=<pattern>]
-	 * : Shell-style glob pattern where `*` is replaced by the bare repo name.
+	 * : Pattern where `*` is replaced by the bare repo name.
 	 * `plugin` + `--repo-pattern=wp-scaffold-*` => `wp-scaffold-plugin`.
-	 * Takes precedence over --repo-prefix / --repo-suffix when all three are set.
+	 * `plugin` + `--repo-pattern=*-scaffold`    => `plugin-scaffold`.
+	 * `plugin` + `--repo-pattern=my-*-tpl`      => `my-plugin-tpl`.
+	 * Best set in wp-cli.yml so you never have to type it.
 	 *
 	 * [--dir=<dirname>]
 	 * : Output directory. Defaults to the WordPress plugins directory.
@@ -238,23 +232,19 @@ class Camaleaun_Scaffold_Template_Command extends WP_CLI_Command {
 	}
 
 	/**
-	 * Applies --repo-pattern / --repo-prefix / --repo-suffix to a bare repo name.
+	 * Applies --repo-pattern to a bare repo name.
 	 *
-	 * Priority: repo-pattern > repo-prefix + repo-suffix > name as-is.
+	 * Every `*` in the pattern is replaced by the bare name.
+	 * When no pattern is set the name is returned as-is.
 	 *
 	 * @param  array<string,mixed> $assoc_args
 	 */
 	private function apply_repo_pattern( string $name, array $assoc_args ): string {
 		$pattern = Utils\get_flag_value( $assoc_args, 'repo-pattern', '' );
 		if ( $pattern ) {
-			// Replace the first * in the pattern with the bare name.
 			return str_replace( '*', $name, $pattern );
 		}
-
-		$prefix = Utils\get_flag_value( $assoc_args, 'repo-prefix', '' );
-		$suffix = Utils\get_flag_value( $assoc_args, 'repo-suffix', '' );
-
-		return $prefix . $name . $suffix;
+		return $name;
 	}
 
 	/**
