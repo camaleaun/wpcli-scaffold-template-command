@@ -529,9 +529,16 @@ class Camaleaun_Scaffold_Template_Command extends WP_CLI_Command {
 			$ch = $raw[ $i ];
 
 			if ( $in_str ) {
-				// Inside a single-quoted string — only closing quote ends it.
 				$buf .= $ch;
-				if ( '\'' === $ch && ( $i === 0 || '\\' !== $raw[ $i - 1 ] ) ) {
+				if ( '\\' === $ch && $i + 1 < $len ) {
+					// Consume the escaped character as a single unit so that
+					// '\\' (escaped backslash) never leaves a lone \ before
+					// the closing quote.
+					$i++;
+					$buf .= $raw[ $i ];
+					continue;
+				}
+				if ( '\'' === $ch ) {
 					$in_str = false;
 				}
 				continue;
