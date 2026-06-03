@@ -1,0 +1,51 @@
+{
+    "name": "camaleaun/wpcli-scaffold-template-command",
+    "type": "wp-cli-package",
+    "description": "WP-CLI command: wp scaffold template <vendor/repo> — generic scaffold engine driven by YAML + Mustache template packs.",
+    "homepage": "https://camaleaun.github.io",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Camaleaun",
+            "homepage": "https://camaleaun.github.io"
+        }
+    ],
+    "require": {
+        "wp-cli/wp-cli": "^2.0"
+    },
+    "require-dev": {
+        "wp-cli/wp-cli-tests": "^4.2 || ^5"
+    },
+    "config": {
+        "process-timeout": 7200,
+        "sort-packages": true,
+        "lock": false
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "1.x-dev"
+        },
+        "commands": [
+            "scaffold template"
+        ]
+    },
+    "autoload": {
+        "classmap": [
+            "src/"
+        ],
+        "files": [
+            "wpcli-scaffold-template-command.php"
+        ]
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "scripts": {
+        "behat": "run-behat-tests",
+        "behat-rerun": "rerun-behat-tests",
+        "prepare-tests": "install-package-tests",
+        "test": ["@behat"]
+    },
+    "support": {
+        "issues": "https://github.com/camaleaun/wpcli-scaffold-template-command/issues"
+    }
+}
